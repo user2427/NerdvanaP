@@ -6,176 +6,120 @@
     <title>Nerdvana - Chatrooms</title>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, push, onChildAdded, off } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-        const firebaseConfig = {
-  apiKey: "AIzaSyCpMrwimh64mPHdVx_ODfanwq825RI43U0",
-  authDomain: "nerdvanap.firebaseapp.com",
-  databaseURL: "https://nerdvanap-default-rtdb.firebaseio.com",
-  projectId: "nerdvanap",
-  storageBucket: "nerdvanap.firebasestorage.app",
-  messagingSenderId: "125970651089",
-  appId: "1:125970651089:web:e589b39257ac35668db2f0"
-};
+        const firebaseConfig = { /* Your Firebase Config */ };
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
         let currentChatroom = "";
+        let unsubscribe = null;
 
         window.openChatroom = function(name) {
+            if (unsubscribe) unsubscribe(); // Unsubscribe from previous
             currentChatroom = name;
             document.getElementById("chatTitle").innerText = name;
             document.getElementById("chatWindow").style.display = "block";
             document.getElementById("chatMessages").innerHTML = "";
 
             const chatRef = ref(db, `chatrooms/${currentChatroom}`);
-            onChildAdded(chatRef, (snapshot) => {
-                let message = snapshot.val();
+            unsubscribe = onChildAdded(chatRef, (snapshot) => {
+                const message = snapshot.val();
                 displayMessage(message);
             });
         }
 
         window.closeChatroom = function() {
             document.getElementById("chatWindow").style.display = "none";
+            if (unsubscribe) unsubscribe();
         }
 
         window.sendMessage = function() {
-            let messageInput = document.getElementById("messageInput");
-            let messageText = messageInput.value.trim();
-            if (messageText === "") return;
+            const messageInput = document.getElementById("messageInput");
+            const messageText = messageInput.value.trim();
+            if (!messageText) return;
 
-            const chatRef = ref(db, `chatrooms/${currentChatroom}`);
-            push(chatRef, { text: messageText, timestamp: Date.now() });  // Added timestamp for sorting
+            push(ref(db, `chatrooms/${currentChatroom}`), {
+                text: messageText,
+                timestamp: Date.now(),
+                // Add user info if implementing auth
+            });
 
             messageInput.value = "";
         }
 
-        window.handleKeyPress = function(event) {
-            if (event.key === "Enter") {
-                sendMessage();
-            }
+        window.handleKeyPress = function(e) {
+            if (e.key === "Enter") sendMessage();
         }
 
         function displayMessage(message) {
-            let messageElement = document.createElement("p");
-            messageElement.textContent = message.text;  // Fixed to properly access message object
-            document.getElementById("chatMessages").appendChild(messageElement);
+            const chatMessages = document.getElementById("chatMessages");
+            const messageElement = document.createElement("div");
+            messageElement.className = "message";
+            
+            const timestamp = new Date(message.timestamp).toLocaleTimeString();
+            messageElement.innerHTML = `
+                <span class="timestamp">${timestamp}</span>
+                <span class="text">${message.text}</span>
+            `;
+            
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight; // Auto-scroll
         }
     </script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #1e1e2e;
-            color: #ffffff;
+        /* ... Previous styles ... */
+
+        /* Responsive Design */
+        @media (max-width: 600px) {
+            .chat-window {
+                width: 90%;
+                height: 80vh;
+            }
+            .message-input {
+                flex-direction: column;
+            }
+            #messageInput {
+                margin-bottom: 10px;
+            }
         }
-        .navbar {
-            background-color: #27293d;
-            padding: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .menu a {
-            color: white;
-            text-decoration: none;
-            font-weight: bold;
-            margin-right: 15px;
-        }
-        .container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            padding: 20px;
-        }
-        .sidebar {
-            background-color: #3a3b5a;
-            padding: 15px;
-            width: 250px;
-            border-radius: 10px;
-        }
-        .chatroom-container {
-            flex-grow: 1;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-        }
-        .chatroom {
-            background-color: #3a3b5a;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 1.2em;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        .chat-window {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: #27293d;
-            width: 400px;
-            height: 500px;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0px 0px 15px rgba(255, 255, 255, 0.2);
-        }
-        .close-btn {
-            background: red;
-            border: none;
-            padding: 5px;
-            color: white;
-            cursor: pointer;
-            float: right;
-        }
-        .chat-messages {
-            height: 350px;
-            overflow-y: auto;
-            background: #1e1e2e;
-            padding: 10px;
+
+        .message {
+            margin: 8px 0;
+            padding: 8px;
+            background: #3a3b5a;
             border-radius: 5px;
-            margin-bottom: 10px;
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            color: #a9a9b5;
+            margin-right: 10px;
+        }
+
+        .message-input {
+            display: flex;
+            gap: 10px;
+        }
+
+        #messageInput {
+            flex-grow: 1;
+            padding: 10px;
         }
     </style>
 </head>
 <body>
-    <div class="navbar">
-        <h2>Nerdvana</h2>
-        <div class="menu">
-            <a href="#">Home</a>
-            <a href="#">Marketplace</a>
-            <a href="#">Profile</a>
-        </div>
-    </div>
-
-    <div class="container">
-        <div class="sidebar">
-            <h3>Popular Topics</h3>
-            <ul>
-                <li>Trending Discussions</li>
-                <li>Latest News</li>
-                <li>Top Users</li>
-            </ul>
-        </div>
-        <div class="chatroom-container">
-            <div class="chatroom" onclick="openChatroom('Physics')">Physics</div>
-            <div class="chatroom" onclick="openChatroom('Anime')">Anime</div>
-            <div class="chatroom" onclick="openChatroom('Comics')">Comics</div>
-            <div class="chatroom" onclick="openChatroom('Gaming')">Gaming</div>
-        </div>
-    </div>
+    <!-- ... Previous HTML ... -->
 
     <div class="chat-window" id="chatWindow">
         <button class="close-btn" onclick="closeChatroom()">X</button>
         <h3 id="chatTitle">Chatroom</h3>
         <div class="chat-messages" id="chatMessages"></div>
-        <input type="text" id="messageInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
-        <button onclick="sendMessage()">Send</button>
+        <div class="message-input">
+            <input type="text" id="messageInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">Send</button>
+        </div>
     </div>
 </body>
 </html>
